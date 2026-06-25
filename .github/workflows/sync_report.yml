@@ -1,0 +1,49 @@
+name: Copiar Directorio a Repo Público
+
+on:
+  push:
+    branches:
+      - main # O la rama que uses por defecto
+    paths:
+      - 'notebooks/**' # El workflow solo se ejecuta si cambia algo acá
+
+jobs:
+  copy-folder:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descargar el contenido del repositorio privado
+      - name: Checkout repo privado
+        uses: actions/checkout@v4
+
+      # 2. Clonar el repositorio público usando el PAT
+      - name: Clonar repo público
+        run: |
+          git clone https://${{ secrets.API_TOKEN_GITHUB }}@github.com/mabarrionuevo/youtube_rating.git youtube_report
+
+      # 3. Copiar el directorio del privado al clon del público
+      - name: Copiar directorio
+        run: |
+          # Asegurar que el directorio de destino exista en el repo público
+          mkdir -p youtube_report/notebooks
+          
+          # Copiar el contenido (limpiando antes si quieres un reemplazo exacto)
+          rsync -av --delete notebooks/ youtube_report/notebooks/
+
+      # 4. Hacer Push de los cambios en el repositorio público
+      - name: Configurar Git y hacer Push
+        run: |
+          cd youtube_report
+          
+          # Configurar un usuario ficticio para el commit
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Verificar si hay cambios antes de hacer commit para evitar errores
+          if [ -n "$(git status --porcelain)" ]; then
+            git add .
+            git commit -m "Update: Copiado automático desde repo privado"
+            git push origin main
+          else
+            echo "No hay cambios para commitear."
+          fi
